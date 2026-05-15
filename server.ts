@@ -3,9 +3,42 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Replicate from 'replicate';
+import * as admin from 'firebase-admin';
+
+// Khởi tạo Firebase Admin
+try {
+  admin.initializeApp();
+} catch (e) {
+  console.log("Firebase admin already initialized or error");
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+async function getApiKeys() {
+  const keys = {
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN,
+    SEEDANCE_API_KEY: process.env.SEEDANCE_API_KEY,
+    SEEDANCE_API_URL: process.env.SEEDANCE_API_URL,
+  };
+  
+  try {
+    const db = admin.firestore();
+    const doc = await db.collection('settings').doc('apikeys').get();
+    if (doc.exists) {
+      const data = doc.data() || {};
+      if (data.OPENAI_API_KEY) keys.OPENAI_API_KEY = data.OPENAI_API_KEY;
+      if (data.REPLICATE_API_TOKEN) keys.REPLICATE_API_TOKEN = data.REPLICATE_API_TOKEN;
+      if (data.SEEDANCE_API_KEY) keys.SEEDANCE_API_KEY = data.SEEDANCE_API_KEY;
+      if (data.SEEDANCE_API_URL) keys.SEEDANCE_API_URL = data.SEEDANCE_API_URL;
+    }
+  } catch (error) {
+    console.error("Error fetching settings:", error);
+  }
+  
+  return keys;
+}
 
 async function startServer() {
   const app = express();
@@ -18,8 +51,9 @@ async function startServer() {
   // API route for Stable Diffusion via Replicate
   app.post('/api/enhance-replicate', async (req, res) => {
     try {
+      const keys = await getApiKeys();
       const { imageBase64, prompt, preserveLayout, preserveMaterials, negative_prompt } = req.body;
-      const replicateToken = process.env.REPLICATE_API_TOKEN;
+      const replicateToken = keys.REPLICATE_API_TOKEN;
 
       if (!replicateToken) {
         return res.status(500).json({ 
@@ -63,13 +97,113 @@ async function startServer() {
 
       // Replicate outputs an array of image URIs for this model
       if (Array.isArray(output) && output.length > 0) {
-        res.json({ resultImage: output[0] });
+        const imageUrl = output[0];
+        const imageRes = await fetch(imageUrl);
+        const imageBuffer = await imageRes.arrayBuffer();
+        const base64 = Buffer.from(imageBuffer).toString('base64');
+        res.json({ resultImage: `data:image/png;base64,${base64}` });
       } else {
         throw new Error('No image returned from Replicate');
       }
     } catch (error: any) {
       console.error('Replicate error:', error);
       res.status(500).json({ error: error.message || 'Lỗi khi gọi Replicate API.' });
+    }
+  });
+
+  // API route for ChatGPT (DALL-E 3)
+  app.post('/api/enhance-chatgpt', async (req, res) => {
+    try {
+      const keys = await getApiKeys();
+      const { prompt } = req.body;
+      const apiKey = keys.OPENAI_API_KEY;
+
+      if (!apiKey) {
+        return res.status(500).json({ 
+          error: 'Missing OPENAI_API_KEY. Vui lòng thêm API Key cho OpenAI vào Settings.' 
+        });
+      }
+      if (!prompt) {
+        return res.status(400).json({ error: 'Missing prompt' });
+      }
+
+      const response = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: "dall-e-3",
+          prompt: prompt,
+          n: 1,
+          size: "1024x1024",
+          response_format: "b64_json"
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Failed to call OpenAI API');
+      }
+
+      if (result.data && result.data.length > 0) {
+        res.json({ resultImage: `data:image/png;base64,${result.data[0].b64_json}` });
+      } else {
+        throw new Error('No image returned from OpenAI');
+      }
+    } catch (error: any) {
+      console.error('ChatGPT API error:', error);
+      res.status(500).json({ error: error.message || 'Lỗi khi gọi ChatGPT API.' });
+    }
+  });
+
+  // API route for Seedance
+  app.post('/api/enhance-seedance', async (req, res) => {
+    try {
+      const keys = await getApiKeys();
+      const { prompt } = req.body;
+      const apiKey = keys.SEEDANCE_API_KEY;
+      const apiUrl = keys.SEEDANCE_API_URL || 'https://api.seedance.com/v1'; // Default or from env
+
+      if (!apiKey) {
+        return res.status(500).json({ 
+          error: 'Missing SEEDANCE_API_KEY. Vui lòng thêm API Key cho Seedance vào Settings.' 
+        });
+      }
+      if (!prompt) {
+        return res.status(400).json({ error: 'Missing prompt' });
+      }
+
+      // We assume Seedance is OpenAI compatible for image generation
+      const response = await fetch(`${apiUrl}/images/generations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: "dall-e-3", // Or whatever model Seedance uses
+          prompt: prompt,
+          n: 1,
+          size: "1024x1024",
+          response_format: "b64_json"
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Failed to call Seedance API');
+      }
+
+      if (result.data && result.data.length > 0) {
+        res.json({ resultImage: `data:image/png;base64,${result.data[0].b64_json}` });
+      } else {
+        throw new Error('No image returned from Seedance');
+      }
+    } catch (error: any) {
+      console.error('Seedance API error:', error);
+      res.status(500).json({ error: error.message || 'Lỗi khi gọi Seedance API.' });
     }
   });
 

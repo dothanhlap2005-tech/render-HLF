@@ -1,6 +1,6 @@
 {
-  "name": "NỘI THẤT HLF ArchiVision AI - Trợ lý Thiết kế Nội thất",
-  "description": "Một công cụ thiết kế nội thất mạnh mẽ bởi AI, giúp biến ảnh chụp phòng thành các gợi ý thiết kế và hình ảnh trực quan chuyên nghiệp.",
-  "requestFramePermissions": [],
+  "name": "Nội thất HLF AI",
+  "description": "Biến ảnh chụp phòng thành các gợi ý thiết kế và hình ảnh trực quan chuyên nghiệp bởi AI.",
+  "requestFramePermissions": ["camera"],
   "majorCapabilities": []
 }

@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user profile in the application.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "User's email address."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's display name."
+        },
+        "createdAt": {
+          "type": "timestamp"
+        },
+        "updatedAt": {
+          "type": "timestamp"
+        }
+      },
+      "required": ["email", "createdAt", "updatedAt"]
+    },
+    "Generation": {
+      "title": "Generation",
+      "description": "An image generation job created by a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ID of the user who created this."
+        },
+        "originalImage": {
+          "type": "string",
+          "description": "Data URL or storage URL of original image."
+        },
+        "resultImage": {
+          "type": "string",
+          "description": "URL of the generated image."
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string"
+        },
+        "roomType": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "timestamp"
+        }
+      },
+      "required": ["userId", "prompt", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Stores user profiles."
+    },
+    "/generations/{generationId}": {
+      "schema": {
+        "$ref": "#/entities/Generation"
+      },
+      "description": "Stores image generations."
+    }
+  }
+}

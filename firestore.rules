@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitive Definition
+    function isValidId(id) { 
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    
+    // For local dev / testing we might allow non-verified if they sign in with google, since it's an applet
+    // Actually, sign in with popup Google login verifies emails automatically. But to be safe,
+    // we'll just check request.auth != null
+    function isAuth() { return request.auth != null; }
+    
+    function isAdmin() {
+      return isAuth() && (request.auth.token.email == 'dothanhlap2005@gmail.com' || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+    
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    // Validation Blueprint for User
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'createdAt', 'updatedAt', 'isApproved', 'credits']) 
+        && data.keys().size() <= 6 // allowing displayName as well
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 200
+        && data.isApproved == false
+        && data.credits is number
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+    
+    function isValidUserUpdate(inc, ext) {
+      return (
+         (isAdmin() && inc.diff(ext).affectedKeys().hasOnly(['isApproved', 'credits', 'updatedAt'])
+         && inc.isApproved is bool
+         && (inc.credits is number || inc.credits == ext.credits)
+         && inc.updatedAt == request.time)
+         ||
+         (inc.diff(ext).affectedKeys().hasOnly(['displayName', 'updatedAt'])
+         && inc.updatedAt == request.time
+         && (inc.displayName == null || (inc.displayName is string && inc.displayName.size() <= 100)))
+         ||
+         (isOwner(request.auth.uid) && inc.diff(ext).affectedKeys().hasOnly(['credits', 'updatedAt'])
+         && (!('credits' in ext) ? inc.credits == 10 : inc.credits == (ext.credits - 1))
+         && inc.updatedAt == request.time)
+      );
+    }
+
+    // Validation Blueprint for Generation
+    function isValidGeneration(data) {
+      return data.keys().hasAll(['userId', 'prompt', 'createdAt'])
+        && data.userId == request.auth.uid
+        && data.prompt is string && data.prompt.size() <= 2000
+        && data.createdAt == request.time
+        && (data.get('originalImage', '') is string)
+        && (data.get('resultImage', '') is string)
+        && (data.get('style', '') is string)
+        && (data.get('roomType', '') is string);
+    }
+
+    // Rules for Admins
+    match /admins/{adminId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+    }
+
+    // Rules for Users
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming());
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUserUpdate(incoming(), existing());
+      // No delete for users
+    }
+
+    // Rules for Generations
+    match /generations/{generationId} {
+      allow get: if isAuth() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuth() && isValidId(generationId) && isValidGeneration(incoming()) && (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true);
+      allow delete: if isAuth() && (existing().userId == request.auth.uid || isAdmin());
+      // No updates for generations
+    }
+
+    // Rules for Settings
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

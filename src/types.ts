@@ -12,6 +12,9 @@ export interface RoomAnalysis {
   structuralElements: string[];
   flooring: string;
   lighting: string;
+  layoutAndFurniture: string;
+  materials: string;
+  spatialAtmosphere: string;
   suggestedPrompt: string;
 }
 
@@ -20,18 +23,25 @@ export type ShadowIntensity = 'Soft' | 'Moderate' | 'Strong';
 export type ColorTemp = 'Warm' | 'Neutral' | 'Cool';
 export type LightDirection = 'Left' | 'Right' | 'Front' | 'Top';
 
-export type RoomType = 'Auto-detect' | 'Living Room' | 'Bedroom' | 'Kitchen' | 'Bathroom' | 'Dining Room' | 'Office' | 'Commercial Space';
+export type RoomType = 'Auto-detect' | 'Living Room' | 'Bedroom' | 'Kitchen' | 'Bathroom' | 'Dining Room' | 'Office' | 'Commercial Space' | 'Studio';
 export type TimeOfDay = 'Morning' | 'Noon' | 'Golden Hour' | 'Blue Hour' | 'Night';
 
 export type CameraLens = 'Standard 35mm' | 'Wide 24mm' | 'Ultra-wide 16mm' | 'Telephoto 85mm' | 'Cinematic Anamorphic';
+export type CameraAngle = 'Default' | 'Eye Level' | 'Low Angle' | 'High Angle' | 'Bird\'s Eye View' | 'Isometric';
 export type RenderEngine = 'Corona Render' | 'V-Ray' | 'Octane Render' | 'Unreal Engine 5 (Lumen)' | 'Redshift';
 
-export type AIEngine = 'gemini' | 'replicate';
+export type AIEngine = 'gemini' | 'replicate' | 'chatgpt' | 'seedance';
+
+export type Material = 'Wood' | 'Marble' | 'Concrete' | 'Velvet' | 'Leather' | 'Metal' | 'Glass' | 'Linen' | 'Boucle' | 'Terrazzo' | 'Microcement' | 'Exposed Brick' | 'Plaster';
+
+export type SurfaceTarget = 'Floor' | 'Wall' | 'Ceiling' | 'Furniture' | 'General';
+export type MaterialOverrides = Record<SurfaceTarget, Material | ''>;
 
 export interface DesignState {
   originalImage: string | null;
   analysis: RoomAnalysis | null;
   selectedStyle: InteriorStyle;
+  materialOverrides: MaterialOverrides;
   roomType: RoomType;
   lightingMode: LightingMode;
   shadowIntensity: ShadowIntensity;
@@ -39,6 +49,7 @@ export interface DesignState {
   lightDirection: LightDirection;
   timeOfDay: TimeOfDay;
   cameraLens: CameraLens;
+  cameraAngle: CameraAngle;
   renderEngine: RenderEngine;
   preserveLayout: boolean;
   preserveMaterials: boolean;
@@ -50,5 +61,6 @@ export interface DesignState {
   isAnalyzing: boolean;
   isGenerating: boolean;
   resultImage: string | null;
+  generatedPrompt: string | null;
   error: string | null;
 }

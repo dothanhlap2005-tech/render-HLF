@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nội thất HLF</string>
+    <string name="title_activity_main">Nội thất HLF</string>
+    <string name="package_name">com.hlf.ai</string>
+    <string name="custom_url_scheme">com.hlf.ai</string>
+</resources>
